@@ -1,0 +1,20 @@
+<html>   
+<head>   
+    <title>upload the file : GFG</title>   
+</head>   
+<body>   
+    <form action = "/v1/api/order/create" method = "post" enctype="multipart/form-data">   
+        <input type="file" name="file" />  
+        <input type="text"   
+        name="userID" placeholder="Enter some text">
+        <input type="text" name="printerID" placeholder="123">
+        <input type="text" name = "paperSize" placeholder="A4">
+        <input type="text" name = "numPage" placeholder="3">
+        <input type="text" name = "numCopy" placeholder="3">
+        <input type="text" name = "scale" placeholder="No">
+        <input type="text" name="orientation" placeholder="portrait">
+        <input type="text" name="numSide" placeholder="2">
+        <input type = "submit" value="Upload">   
+    </form>   
+</body>   
+</html>
