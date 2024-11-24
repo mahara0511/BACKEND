@@ -70,7 +70,9 @@ if 'FILE' not in lancedb_instance.table_names():
         pa.field('fileName',pa.string()),
         pa.field('isDeleted',pa.bool_()),
         pa.field('url',pa.string()),
-        pa.field('type',pa.string())
+        pa.field('type',pa.string()),
+        pa.field('time',pa.string()),
+        pa.field('size',pa.int64())#size in bytes
     ])
 
     lancedb_instance.create_table('FILE',schema=file_schema)
@@ -258,7 +260,8 @@ def upload():
             path = FILE_PATH + f.filename
             f.save(path)
             id = str(uuid.uuid4())
-            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type'])
+            created_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type','time','size'])
             new_file = {
                 "id" : [id],
                 "userID" : [userID],
@@ -266,6 +269,8 @@ def upload():
                 "isDeleted" : [False],
                 "url" : [path],
                 'type' : [f.content_type],
+                'time' : [created_time],
+                'size' : [os.path.getsize(path)]
             }
 
             df = pd.concat([df,pd.DataFrame(new_file)],ignore_index=True)
@@ -278,6 +283,8 @@ def upload():
                 "isDeleted" : False,
                 "url" : path,
                 'type' : f.content_type,
+                'time' : created_time,
+                'size' : os.path.getsize(path)
             }
             response = {
                 'status' : 200,
@@ -421,7 +428,7 @@ def create_print_order():
             path = FILE_PATH + f.filename
             f.save(path)
             id = str(uuid.uuid4())
-            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type'])
+            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type','time','size'])
             new_file = {
                 "id" : [id],
                 "userID" : [userID],
@@ -429,6 +436,8 @@ def create_print_order():
                 "isDeleted" : [False],
                 "url" : [path],
                 'type' : [f.content_type],
+                'time' : [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                'size' : [os.path.getsize(path)]
             }
 
             df = pd.concat([df,pd.DataFrame(new_file)],ignore_index=True)
