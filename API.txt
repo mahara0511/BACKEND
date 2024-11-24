@@ -1,0 +1,234 @@
+register user with ID = 1
+http://localhost:8080/v1/api/register
+method = POST
+request = {
+	'email' : kiendepzai3@gmail.com,
+	'password' : 123,
+	'username' : lmao
+}
+
+
+
+response = {
+    "data": {
+        "avatar_url": "",
+        "balance": 0,
+        "email": "kiendepzai3@gmail.com",
+        "id": "1",
+        "name": "lmao",
+        "pages": 40,
+        "password": "$2b$12$LBzdRwBdnUZ8KQG3SDDwgO5xs5rkLStg/H5ZDKTIQdzC5UFstNu0G",
+        "role": "user"
+    },
+    "message": "register successfully",
+    "status": 200
+}
+
+Note : password is hashed with sha
+
+
+
+-----------------------------------------------------------------------------
+
+
+
+lấy ra số tờ in của 1 user sử dung api get user profile là được
+api : 
+http://localhost:8080/v1/api/user/{userID} Thay user ID
+method = GET
+
+response = {
+    "data": {
+        "avatar_url": null,
+        "balance": 0,
+        "email": "kiendepzai3@gmail.com",
+        "id": "1",
+        "name": "emkienngu123",
+        "pages": 40,
+        "password": "$2b$12$LBzdRwBdnUZ8KQG3SDDwgO5xs5rkLStg/H5ZDKTIQdzC5UFstNu0G",
+        "role": "user"
+    },
+    "message": "Found user ",
+    "status": 200
+}
+
+lay response.pages la duoc
+
+-------------------------------------------------
+upload file
+http://localhost:8080/v1/api/uploadFile
+method = POST
+request = {
+	files : {...},//di cung voi submit
+}
+
+response = {
+  "data": {
+    "fileName": "Zhang_Pixel_Screening_Based_Intermediate_Correction_for_Blind_Deblurring_CVPR_2022_paper.pdf",
+    "id": "3e8f5433-97bc-41ab-8a14-c8044433a95e",
+    "isDeleted": false,
+    "size": 7868071,
+    "time": "2024-11-24 23:01:25",
+    "type": "application/pdf",
+    "url": "file_uploading/Zhang_Pixel_Screening_Based_Intermediate_Correction_for_Blind_Deblurring_CVPR_2022_paper.pdf",
+    "userID": "1"
+  },
+  "message": "upload successfully",
+  "status": 200
+}
+
+---------------------------------------------------------------------
+delete file
+http://localhost:8080/v1/api/file/delete
+method = DELETE
+request = {
+	fileID : 3e8f5433-97bc-41ab-8a14-c8044433a95e
+}
+response = {
+    "data": {
+        "fileName": "Zhang_Pixel_Screening_Based_Intermediate_Correction_for_Blind_Deblurring_CVPR_2022_paper.pdf",
+        "id": "3e8f5433-97bc-41ab-8a14-c8044433a95e",
+        "isDeleted": true,
+        "size": 7868071,
+        "time": "2024-11-24 23:01:25",
+        "type": "application/pdf",
+        "url": null,
+        "userID": "1"
+    },
+    "message": "Deleted successfully",
+    "status": 200
+}
+
+
+just set the status isDeleted to true , front end must handle the rest
+	
+
+
+
+------------------------------------------------------------------------------------------
+
+mua giấy ---> tang page  
+http://localhost:8080/v1/api/buyPages
+method = POST
+
+request = {
+	'numPage' : 	2,
+	'cost' : 0 ,
+	'method' : bkpay
+}
+
+
+
+response = {
+    "data": {
+        "amount": "2",
+        "id": 1,
+        "method": "bkpay",
+        "status": "Successful",
+        "time": "2024-11-24 22:46:54",
+        "userID": "1"
+    },
+    "message": "Buy pages successfully",
+    "status": 200
+}
+
+
+---------------------------------------------------------------------------------
+tạo print order và lưu
+http://localhost:8080/v1/api/order/create
+method = POST
+phai luu file truoc khi in
+luu xong se co fileID
+
+request = {
+	numCopy : 2,
+	numPage : 1,
+	numSide : 1,
+	printerID : 123,
+	scale : No,
+	paperSize : A4,
+	orientation : portrait
+}
+
+
+response = {
+  "data": {
+    "fileID": "271db689-21a4-4778-a5ec-7c369825473d",
+    "id": 1,
+    "numCopy": 3,
+    "numPage": 3,
+    "numSide": 2,
+    "orientation": "portrait",
+    "paperSize": "A4",
+    "printerID": "123",
+    "scale": "No",
+    "status": "Progressing",
+    "time": "2024-11-24 22:54:29",
+    "userID": "1"
+  },
+  "message": "Send order request successfully",
+  "status": 200
+}
+
+
+----------------------------------------------------------
+
+lấy lịch sử in
+http://localhost:8080/v1/api/getHistory/{userID}
+method = GET
+
+response = {
+    "data": [
+        {
+            "fileID": "271db689-21a4-4778-a5ec-7c369825473d",
+            "id": "1",
+            "numCopy": 3,
+            "numPage": 3,
+            "numSide": 2,
+            "orientation": "portrait",
+            "paperSize": "A4",
+            "printerID": "123",
+            "scale": "No",
+            "status": "Progressing",
+            "time": "2024-11-24 22:54:29",
+            "userID": "1"
+        }
+    ],
+    "message": "Get history successfully",
+    "status": 200
+}
+
+
+--------------------------------------------------------
+
+
+update status
+http://localhost:8080/v1/api/updateStatus/<string:orderID>
+orderID la id cua cai print order trong method create order
+method = POST
+
+
+request = {
+	status : vaicaloz
+}
+
+
+response = {
+    "data": {
+        "fileID": "271db689-21a4-4778-a5ec-7c369825473d",
+        "id": "1",
+        "numCopy": 3,
+        "numPage": 3,
+        "numSide": 2,
+        "orientation": "portrait",
+        "paperSize": "A4",
+        "printerID": "123",
+        "scale": "No",
+        "status": "vaicaloz",
+        "time": "2024-11-24 22:54:29",
+        "userID": "1"
+    },
+    "message": "update order status successfully",
+    "status": 200
+}
+
