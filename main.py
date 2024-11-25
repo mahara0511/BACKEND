@@ -10,10 +10,12 @@ import pyarrow as pa
 from flask import (Flask, redirect, render_template, request,
                    send_from_directory, session, url_for)
 from flask_session import Session
+from flask_cors import CORS
 from PIL import Image
 from flask import Flask, jsonify, request , Response
 
 app = Flask(__name__)
+CORS(app)
 
 lancedb_instance = lancedb.connect('database.lance')
 TABLE_NAME = ['USER','PRINTER','LOCATION','FILE','PRINTING JOB','CONFIGURATION','REPORT','EVENT','REPORT EVENT']
@@ -118,6 +120,7 @@ if 'BUY_PAGE' not in lancedb_instance.table_names():
         pa.field('userID',pa.string()),
         pa.field('time',pa.string()),
         pa.field('amount',pa.int32()),
+        pa.field('totalPrice', pa.int32()),
         pa.field('method',pa.string()),
         pa.field('status',pa.string())
     ])
@@ -494,10 +497,11 @@ def user_buy_pages():
     global buy_pages
     global users
     userID = "1"
+    # data = request.json
+    # print("Incoming request data:", data)
 
-
-    numPage = request.form['numPage']
-    cost = request.form['cost']
+    numPage = int(request.form['numPage'])
+    cost = int(request.form['cost'])
     method = request.form['method']
     id = len(buy_pages.to_pandas()) + 1 
 
@@ -512,18 +516,19 @@ def user_buy_pages():
     else:
         status = None
         user = user.iloc[0].to_dict()
-        if user['balance'] < int(cost):
-            status = 'Failed'
+        # if user['balance'] < int(cost):
+        #     status = 'Failed'
         
-        else:
-            users.update(where='id = "1"' , values={'balance' : user['balance'] - int(cost) , 'pages' : user['pages'] + int(numPage)})
-            status = 'Successful'
-        df = pd.DataFrame(columns=['id' , 'userID' , 'time' , 'amount' , 'method' , 'status'])
+        # else:
+        users.update(where='id = "1"' , values={'balance' : user['balance'] - int(cost) , 'pages' : user['pages'] + int(numPage)})
+        status = 'Successful'
+        df = pd.DataFrame(columns=['id' , 'userID' , 'time' , 'amount', 'totalPrice' , 'method' , 'status'])
         new_record = {
             'id' : [id] ,
             'userID' : [userID],
             'time' : [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
             'amount' : [numPage],
+            'totalPrice': [cost],
             'method' : [method] , 
             'status' : [status]
         }

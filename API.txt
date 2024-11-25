@@ -112,7 +112,7 @@ http://localhost:8080/v1/api/buyPages
 method = POST
 
 request = {
-	'numPage' : 	2,
+	'numPage' : 2,
 	'cost' : 0 ,
 	'method' : bkpay
 }
@@ -131,6 +131,11 @@ response = {
     "message": "Buy pages successfully",
     "status": 200
 }
+
+in ra lịch sử mua giấy
+http://localhost:8080/v1/api/buyPages/record
+method = GET
+
 
 
 ---------------------------------------------------------------------------------
