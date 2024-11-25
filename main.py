@@ -549,6 +549,33 @@ def user_buy_pages():
 
         return jsonify(response)
     
+@app.route('/v1/api/buyPages/records', methods=['GET'])
+def show_all_records():
+    global buy_pages
+
+    try:
+        # Lấy toàn bộ dữ liệu từ bảng buy_pages
+        records = buy_pages.to_pandas()
+        
+        # Chuyển dữ liệu thành dạng dictionary
+        data = records.to_dict(orient='records')
+
+        response = {
+            'status': 200,
+            'message': 'Records fetched successfully',
+            'data': data
+        }
+        return jsonify(response)
+
+    except Exception as e:
+        response = {
+            'status': 500,
+            'message': 'An error occurred while fetching records',
+            'error': str(e)
+        }
+        return jsonify(response), 500
+
+
 @app.route('/v1/api/getHistory/<string:userID>' , methods = ['GET'])
 def get_history(userID):
     global orders
