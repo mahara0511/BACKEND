@@ -245,74 +245,95 @@ def login():
             return Response('Unauthorized',mimetype='text/plain',status = 401)
         
 
-@app.route('/v1/api/uploadFile',methods = ['POST'])
+@app.route('/v1/api/uploadFile', methods=['POST'])
 def upload():
     FILE_PATH = 'file_uploading/'
+    if not os.path.exists(FILE_PATH):
+        os.makedirs(FILE_PATH)
     global files
     userID = "1"
-    if request.method == 'POST' :
+
+    if request.method == 'POST':
+        # Check if 'file' is in the request
         if 'file' not in request.files or request.files['file'].filename == '':
             response = {
-                "status" : 400,
-                'message' : "No file to save"
+                "status": 400,
+                "message": "No file to save"
             }
-            return Response('No file to save',status=400)
-        
-        else:
-            f = request.files['file']
-            path = FILE_PATH + f.filename
-            f.save(path)
-            id = str(uuid.uuid4())
-            created_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type','time','size'])
-            new_file = {
-                "id" : [id],
-                "userID" : [userID],
-                "fileName" : [f.filename],
-                "isDeleted" : [False],
-                "url" : [path],
-                'type' : [f.content_type],
-                'time' : [created_time],
-                'size' : [os.path.getsize(path)]
-            }
+            return Response('No file to save', status=400)
 
-            df = pd.concat([df,pd.DataFrame(new_file)],ignore_index=True)
-            files.add(df)
+        f = request.files['file']
+        file_name = f.filename
 
-            data = {
-                "id" : id,
-                "userID" : userID,
-                "fileName" : f.filename,
-                "isDeleted" : False,
-                "url" : path,
-                'type' : f.content_type,
-                'time' : created_time,
-                'size' : os.path.getsize(path)
-            }
+        # Check if a file with the same name already exists
+        table = files.to_pandas()
+        if not table[table['fileName'] == file_name].empty:
             response = {
-                'status' : 200,
-                'message' : 'upload successfully',
-                'data' : data
+                "status": 400,
+                "message": f"A file with the name '{file_name}' already exists."
             }
-            return jsonify(response)
+            return jsonify(response), 400
+
+        # Save the file
+        path = os.path.join(FILE_PATH, file_name)
+        f.save(path)
+
+        # Generate file details
+        id = str(uuid.uuid4())
+        created_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        new_file = {
+            "id": [id],
+            "userID": [userID],
+            "fileName": [file_name],
+            "isDeleted": [False],
+            "url": [path],
+            "type": [f.content_type],
+            "time": [created_time],
+            "size": [os.path.getsize(path)]
+        }
+
+        # Add to the global database
+        df = pd.DataFrame(new_file)
+        files.add(df)
+
+        # Prepare the response
+        data = {
+            "id": id,
+            "userID": userID,
+            "fileName": file_name,
+            "isDeleted": False,
+            "url": path,
+            "type": f.content_type,
+            "time": created_time,
+            "size": os.path.getsize(path)
+        }
+        response = {
+            "status": 200,
+            "message": "Upload successfully",
+            "data": data
+        }
+        return jsonify(response)
 
 
-@app.route('/v1/api/file/user/<string:user_ID>' , methods = ['GET'])
+
+@app.route('/v1/api/file/user/<string:user_ID>', methods=['GET'])
 def get_file_by_user(user_ID):
     global files
     table = files.to_pandas()
-    user_files = table[table['userID']==user_ID]
-    data = []
-    for i , row in user_files.iterrows():
-        data.append(row.to_dict())
 
+    # Filter files by userID and where isDeleted is False
+    user_files = table[(table['userID'] == user_ID) & (table['isDeleted'] == False)]
+    
+    # Convert the filtered rows to a list of dictionaries
+    data = [row.to_dict() for _, row in user_files.iterrows()]
 
     response = {
-        'status' : 200,
-        'message' : 'Get file successfully',
-        'data' : data
+        'status': 200,
+        'message': 'Get file successfully',
+        'data': data
     }
     return jsonify(response)
+
 
 
 
@@ -354,41 +375,40 @@ def get_all_files():
     return jsonify(response)
 
 
-@app.route('/v1/api/file/delete' , methods = ['DELETE'])
-def delete_file():
+@app.route('/v1/api/file/delete/<fileID>', methods=['DELETE'])
+def delete_file(fileID):
     global files
-    fileID = request.form['fileID']
     table = files.to_pandas()
-
-    if len(table[table['id']==fileID]) == 0:
+    print("Received fileID:", fileID)
+    
+    # Check if the file with the given fileID exists in the database
+    if len(table[table['id'] == fileID]) == 0:
         response = {
-            'status' : 404 ,
-            'message' : 'No such file to delete'
-        } 
-        return jsonify(response)
-
-    if (table[table['id']==fileID].iloc[0].to_dict()['isDeleted'] == True):
-        response = {
-            'status' : 404 ,
-            'message' : 'File already deleted'
+            'status': 404,
+            'message': 'No such file to delete'
         }
+        return jsonify(response)
+        # Permanently delete the file record from the database
+    files.delete(where='id = ' + '"' + fileID + '"')
 
-
+    # Get the file path to be deleted
+    file_path = table[table['id'] == fileID].iloc[0].to_dict()['url']
+    try:
+        # Delete the actual file from the filesystem
+        os.remove(file_path)
+    except FileNotFoundError:
+        response = {
+            'status': 404,
+            'message': 'File not found in the system'
+        }
         return jsonify(response)
 
-    os.remove(table[table['id']==fileID].iloc[0].to_dict()['url'])
-    files.update(where='id = ' + '"' + fileID + '"' , values={'isDeleted' : True , 'url' : ''})
 
-    table = files.to_pandas()
-    print(table)
-
-
+    # Return a success response
     response = {
-        'status' : 200,
-        'message' : 'Deleted successfully',
-        'data' : table[table['id']==fileID].iloc[0].to_dict()
+        'status': 200,
+        'message': 'File deleted successfully from filesystem and database'
     }
-
 
     return jsonify(response)
 

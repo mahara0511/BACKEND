@@ -104,7 +104,14 @@ just set the status isDeleted to true , front end must handle the rest
 	
 
 
-
+------------------------------------------------------------------------------------------
+get files
+http://localhost:8080/v1/api/file/user/1
+method = GET
+------------------------------------------------------------------------------------------
+get file with id
+http://localhost:8080/v1/api/file/${id}
+method = GET
 ------------------------------------------------------------------------------------------
 
 mua giấy ---> tang page  
@@ -133,7 +140,7 @@ response = {
 }
 
 in ra lịch sử mua giấy
-http://localhost:8080/v1/api/buyPages/record
+http://localhost:8080/v1/api/buyPages/records
 method = GET
 
 
