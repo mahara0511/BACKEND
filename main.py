@@ -8,7 +8,7 @@ import datetime
 import requests
 import pyarrow as pa
 from flask import (Flask, redirect, render_template, request,
-                   send_from_directory, session, url_for)
+                   send_from_directory, session, url_for, abort)
 from flask_session import Session
 from flask_cors import CORS
 from PIL import Image
@@ -87,7 +87,7 @@ if 'ORDER' not in lancedb_instance.table_names():
         pa.field('id',pa.string()),
         pa.field('printerID',pa.string()),
         pa.field('userID',pa.string()),
-        pa.field('fileID',pa.string()),
+        pa.field('fileName',pa.string()),
         pa.field('time', pa.string()),
         pa.field('paperSize',pa.string()),
         pa.field('numPage',pa.int32()),
@@ -355,6 +355,35 @@ def get_file_by_fileID(fileID):
 
     return jsonify(response)
 
+from flask import send_from_directory, abort, jsonify
+import os
+
+@app.route('/download/<file_id>', methods=['GET'])
+def download_file(file_id):
+    # Lấy dữ liệu file từ cơ sở dữ liệu
+    global files
+    table = files.to_pandas()
+    
+    # Tìm file theo fileID
+    file_info = table[table['id'] == file_id]
+    
+    if not file_info.empty:
+        # Lấy tên file từ cơ sở dữ liệu (giả sử tên file là ở cột 'fileName')
+        file_name = file_info.iloc[0]['fileName']  # Lấy tên file từ dòng đầu tiên
+        
+        # Xây dựng đường dẫn đầy đủ đến file
+        file_path = os.path.join('file_uploading', file_name)
+        
+        # Kiểm tra xem file có tồn tại không
+        if os.path.exists(file_path):
+            # Trả về file nếu có tồn tại
+            return send_from_directory(directory='file_uploading', path=file_name, as_attachment=True)
+        else:
+            # Nếu file không tồn tại, trả về lỗi 404 với thông báo chi tiết
+            abort(404, description="File không tồn tại")
+    else:
+        # Nếu không tìm thấy file trong cơ sở dữ liệu, trả về lỗi 404
+        abort(404, description="File không tồn tại trong cơ sở dữ liệu")
 
 
 @app.route('/v1/api/file' , methods = ['GET'])
@@ -413,103 +442,158 @@ def delete_file(fileID):
     return jsonify(response)
 
 
-@app.route('/v1/api/user/<string:userID>' , methods = ['GET'])
-def get_user_profile(userID):
-    global users
-    table = users.to_pandas()
-    user_table = table[table['id'] == userID]
-    if len(user_table) == 0 :
-        return Response('No user found' , status=404)
-    
-    else:
-        data = user_table.iloc[0].to_dict()
-        response = {
-            'status' : 200 , 
-            'message' : 'Found user ',
-            'data' : data
-        }
-
-        return jsonify(response)
-    
-
-@app.route('/v1/api/order/create' , methods = ['POST'])
+@app.route('/v1/api/order/create', methods=['POST'])
 def create_print_order():
     global orders
     global files
     FILE_PATH = 'file_uploading/'
     userID = "1"
-    if request.method == 'POST' :
+    
+    if request.method == 'POST':
+        # Kiểm tra xem có file được upload không và tên file
         if 'file' not in request.files or request.files['file'].filename == '':
             response = {
-                "status" : 400,
-                'message' : "No file to save"
+                "status": 400,
+                'message': "No file to save"
             }
-            return Response('No file to save',status=400)
+            return jsonify(response), 400
         
-        else:
-            f = request.files['file']
-            path = FILE_PATH + f.filename
-            f.save(path)
-            id = str(uuid.uuid4())
-            df = pd.DataFrame(columns=['id',"userID","filename","isDeleted","url",'type','time','size'])
-            new_file = {
-                "id" : [id],
-                "userID" : [userID],
-                "fileName" : [f.filename],
-                "isDeleted" : [False],
-                "url" : [path],
-                'type' : [f.content_type],
-                'time' : [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-                'size' : [os.path.getsize(path)]
-            }
+        # Lấy thông tin file
+        f = request.files['file']
+        file_name = f.filename
+        path = FILE_PATH + file_name
+        
+        # Kiểm tra xem tên file đã tồn tại trong cơ sở dữ liệu chưa
+        try:
+            # Chuyển đổi LanceTable thành DataFrame nếu cần
+            existing_file = pd.DataFrame(files.to_pandas())
+            existing_file = existing_file[existing_file['fileName'] == file_name]
+            
+            if not existing_file.empty:  # Nếu tên file đã tồn tại
+                # Lấy ID của file đã tồn tại
+                fileID = existing_file.iloc[0]['id']
+            else:
+                # Lưu file vào đường dẫn
+                f.save(path)
+                fileID = str(uuid.uuid4())  # Tạo ID mới cho file
+                
+                # Thêm thông tin file vào cơ sở dữ liệu
+                new_file = {
+                    "id": [fileID],
+                    "userID": [userID],
+                    "fileName": [file_name],
+                    "isDeleted": [False],
+                    "url": [path],
+                    'type': [f.content_type],
+                    'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                    'size': [os.path.getsize(path)]
+                }
+                
+                df = pd.DataFrame(new_file)
+                files.add(df)
+        except Exception as e:
+            return jsonify({"status": 500, "message": str(e)}), 500
+        
+        # Lấy các tham số khác từ form
+        numcopy = request.form['numCopy']
+        numpage = request.form['numPage']
+        orientation = request.form['orientation']
+        scale = request.form['scale']
+        papersize = request.form['paperSize']
+        numside = request.form['numSide']
+        printerID = request.form['printerID']
+        
+        # Tạo ID cho đơn hàng mới
+        order_id = len(orders.to_pandas()) + 1
+        
+        # Tạo DataFrame cho đơn hàng mới
+        new_order_row = {
+            'id': [str(order_id)],  # Chuyển cột id thành kiểu chuỗi
+            'printerID': [printerID],
+            'userID': [userID],
+            'fileName': [file_name],
+            'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            'paperSize': [papersize],
+            'numPage': [int(numpage)],
+            'numSide': [int(numside)],
+            'numCopy': [int(numcopy)],
+            'scale': [scale],
+            'orientation': [orientation],
+            'status': ['Progressing']
+        }
+        
+        new_order_df = pd.DataFrame(new_order_row)
+        
+        # Cập nhật đơn hàng vào cơ sở dữ liệu
+        orders.add(new_order_df)
+        
+        # Tạo phản hồi trả về
+        response = {
+            'status': 200,
+            'message': 'Send order request successfully',
+            'data': new_order_row
+        }
 
-            df = pd.concat([df,pd.DataFrame(new_file)],ignore_index=True)
-            files.add(df)
-    fileID = id
-    numcopy = request.form['numCopy']
-    numpage = request.form['numPage']
-    orientation = request.form['orientation']
-    scale = request.form['scale']
-    papersize = request.form['paperSize']   
-    numside = request.form['numSide']
-    printerID = request.form['printerID']
-    id = len(orders.to_pandas()) + 1
-
-
-    userID = "1"
-
-
-
-
+        return jsonify(response)
     
-    df = pd.DataFrame(columns=['id','printerID','userID','fileID','time','paperSize','numPage','numSide','numCopy','scale','orientation','status'])
+
+@app.route('/v1/api/order/create1', methods=['POST'])
+def create_print_order1():
+        global files
+        global orders
+        # Lấy các tham số khác từ form
+        userID = '1'
+        fileID = request.form['fileID']
+        numcopy = request.form['numCopy']
+        numpage = request.form['numPage']
+        orientation = request.form['orientation']
+        scale = request.form['scale']
+        papersize = request.form['paperSize']
+        numside = request.form['numSide']
+        printerID = request.form['printerID']
+        
+
+        file_row = files.to_pandas()  # Giả sử `files` chứa thông tin các file đã upload
+        file_name_row = file_row[file_row['id'] == fileID]  # Tìm dòng có fileID tương ứng
+
+        if not file_name_row.empty:
+            file_name = file_name_row.iloc[0]['fileName']  # Lấy fileName từ dòng tìm thấy
+        else:
+            return jsonify({'status': 400, 'message': 'File ID not found'}), 400  # Nếu không tìm thấy file
+        # Tạo ID cho đơn hàng mới
+        order_id = len(orders.to_pandas()) + 1
+        
+        # Tạo DataFrame cho đơn hàng mới
+        new_order_row = {
+            'id': [str(order_id)],  # Chuyển cột id thành kiểu chuỗi
+            'printerID': [printerID],
+            'userID': [userID],
+            'fileName': [file_name],
+            'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            'paperSize': [papersize],
+            'numPage': [int(numpage)],
+            'numSide': [int(numside)],
+            'numCopy': [int(numcopy)],
+            'scale': [scale],
+            'orientation': [orientation],
+            'status': ['Progressing']
+        }
+        
+        new_order_df = pd.DataFrame(new_order_row)
+        
+        # Cập nhật đơn hàng vào cơ sở dữ liệu
+        orders.add(new_order_df)
+        
+        # Tạo phản hồi trả về
+        response = {
+            'status': 200,
+            'message': 'Send order request successfully',
+            'data': new_order_row
+        }
+
+        return jsonify(response)
 
 
-    new_order_row = {
-        'id' : [id],
-        'printerID' : [printerID],
-        'userID' : [userID],
-        'fileID' : [fileID],
-        'time' : [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-        'paperSize' : [papersize],
-        'numPage' : [int(numpage)],
-        'numSide' :[int(numside)],
-        'numCopy' : [int(numcopy)],
-        'scale' : [scale],
-        'orientation' : [orientation],
-        'status' : ['Progressing']
-    }
-    new_order_row = pd.DataFrame(new_order_row)
-    df = pd.concat([df,new_order_row] , ignore_index=True)
-    orders.add(df)
-
-    response = {
-        'status' : 200 ,
-        'message' : 'Send order request successfully',
-        'data' : new_order_row.iloc[0].to_dict()
-    }
-
-    return jsonify(response)
 
 
 @app.route('/v1/api/buyPages' , methods = ['POST'])
