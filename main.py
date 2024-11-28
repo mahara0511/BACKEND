@@ -441,6 +441,23 @@ def delete_file(fileID):
 
     return jsonify(response)
 
+@app.route('/v1/api/user/<string:userID>' , methods = ['GET'])
+def get_user_profile(userID):
+    global users
+    table = users.to_pandas()
+    user_table = table[table['id'] == userID]
+    if len(user_table) == 0 :
+        return Response('No user found' , status=404)
+    
+    else:
+        data = user_table.iloc[0].to_dict()
+        response = {
+            'status' : 200 , 
+            'message' : 'Found user ',
+            'data' : data
+        }
+
+        return jsonify(response)
 
 @app.route('/v1/api/order/create', methods=['POST'])
 def create_print_order():
